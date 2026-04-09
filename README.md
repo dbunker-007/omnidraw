@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Omnidraw
+
+Omnidraw is a layered canvas and 3D editor built with Next.js, React, Zustand, Tailwind CSS, and Three.js. The product goal is to provide a single workspace for composing 2D canvas content and 3D assets inside one editor.
+
+The current implementation is an early editor shell. It exposes canvas size controls, background color controls, and a reset action, then renders the canvas background into a 2D canvas element. The state model already includes canvas, layers, viewport, and active-layer metadata, so the app is set up for a much richer workflow even though most editing tools are not wired up yet.
+
+## What It Does Today
+
+- Lets you inspect and edit the current editor state.
+- Changes canvas width and height from the UI.
+- Toggles a transparent canvas background or sets a solid background color.
+- Resets the store back to the default editor state.
+- Renders the current canvas background to an HTML canvas.
+
+## Product Goal
+
+The intended direction is a unified design surface for:
+
+- 2D image, text, shape, and drawing layers.
+- 3D model layers with snapshot-based previews for the 2D canvas.
+- Layer transforms, visibility, locking, ordering, and viewport navigation.
+- A modular rendering engine split between 2D canvas and 3D scene handling.
+
+## Tech Stack
+
+- Next.js 16 with the App Router.
+- React 19.
+- Zustand for editor state management.
+- Three.js for the 3D layer pipeline.
+- Tailwind CSS 4 for styling.
+- TypeScript in strict mode.
+
+## Project Structure
+
+- [app/page.tsx](app/page.tsx) contains the main editor page and state controls.
+- [app/(core)/components/EditorCanvas.tsx](app/(core)/components/EditorCanvas.tsx) renders the canvas background.
+- [app/(core)/store/editorStore.ts](app/(core)/store/editorStore.ts) holds the editor state and mutation actions.
+- [app/(core)/engine/layers/types.ts](app/(core)/engine/layers/types.ts) defines the layer and editor state types.
+- [app/(core)/engine/renderer/](app/(core)/engine/renderer/) is the planned 2D rendering engine.
+- [app/(core)/engine/three/](app/(core)/engine/three/) is the planned Three.js rendering layer.
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies and start the development server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- npm run dev starts the development server.
+- npm run build creates a production build.
+- npm run start runs the production server.
+- npm run lint runs ESLint.
 
-## Learn More
+## Current Limitations
 
-To learn more about Next.js, take a look at the following resources:
+- Layer rendering is not implemented yet.
+- There are no add, delete, select, or transform tools for layers.
+- The viewport state exists, but zoom and pan controls are not wired up.
+- Three.js is installed, but the 3D scene pipeline is still empty.
+- No persistence, export, or import workflow exists yet.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes For Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The editor state is initialized on the client in [app/page.tsx](app/page.tsx), so avoid triggering Zustand state updates during render. The store already exposes reusable actions for canvas sizing, background updates, layer replacement, viewport changes, and state reset.
