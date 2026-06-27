@@ -1,13 +1,17 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import EditorCanvas from './(core)/components/EditorCanvas'
+import Toolbar from './(core)/components/Toolbar'
+import { pencilTool } from './(core)/components/tools/PencilTool'
+import { selectTool } from './(core)/components/tools/SelectTool'
+import type { EditorToolId } from './(core)/components/tools/types'
 import { EditorState } from './(core)/engine/layers/types'
 import { useEditorStore } from './(core)/store/editorStore'
 
 const EDITOR_STATE: EditorState = {
   canvas: {
-    width: 1200,
+    width: 1600,
     height: 700,
     background: {
       color: null,
@@ -23,88 +27,38 @@ const EDITOR_STATE: EditorState = {
 }
 
 export default function EditorPage() {
-  const editorState = useEditorStore((state) => state.editorState)
   const setEditorState = useEditorStore((state) => state.setEditorState)
-  const setCanvasSize = useEditorStore((state) => state.setCanvasSize)
-  const setBackgroundColor = useEditorStore((state) => state.setBackgroundColor)
-  const resetEditorState = useEditorStore((state) => state.resetEditorState)
+  const [activeTool, setActiveTool] = useState<EditorToolId>('select')
 
   useEffect(() => {
     setEditorState(EDITOR_STATE)
   }, [setEditorState])
 
-  const isTransparent = editorState.canvas.background.color === null
-
-
   return (
-    <main className="min-h-screen w-full bg-slate-950 p-4">
-      <div className="mx-auto w-full">
-        <section className="w-full max-w-7xl rounded-lg border border-slate-800 bg-slate-900 p-3 lg:max-w-xs">
-          <h2 className="text-sm font-semibold text-slate-100">Editor State</h2>
+    <main className="min-h-screen w-full p-4">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
+        <header className="flex flex-col gap-2">
+          <p className="text-xs uppercase tracking-[0.3em]">
+            OmniDraw
+          </p>
+          <h1 className="text-2xl font-semibold">Canvas editor</h1>
+          <p className="max-w-2xl text-sm">
+            Pick a tool, draw a layer, then switch back to Select to move it around.
+          </p>
+        </header>
 
-          <div className="mt-3 space-y-3 text-xs text-slate-300">
-            <label className="block">
-              <span className="mb-1 block text-slate-400">Canvas Width</span>
-              <input
-                type="number"
-                min={1}
-                value={editorState.canvas.width}
-                onChange={(event) => {
-                  const nextWidth = Math.max(1, Number(event.target.value) || 1)
-                  setCanvasSize(nextWidth, editorState.canvas.height)
-                }}
-                className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100"
-              />
-            </label>
+        <Toolbar
+          tools={[selectTool, pencilTool]}
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+        />
 
-            <label className="block">
-              <span className="mb-1 block text-slate-400">Canvas Height</span>
-              <input
-                type="number"
-                min={1}
-                value={editorState.canvas.height}
-                onChange={(event) => {
-                  const nextHeight = Math.max(1, Number(event.target.value) || 1)
-                  setCanvasSize(editorState.canvas.width, nextHeight)
-                }}
-                className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-slate-100"
-              />
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={isTransparent}
-                onChange={(event) =>
-                  setBackgroundColor(event.target.checked ? null : '#ffffff')
-                }
-              />
-              <span>Transparent Background</span>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-slate-400">Background Color</span>
-              <input
-                type="color"
-                value={editorState.canvas.background.color ?? '#ffffff'}
-                onChange={(event) => setBackgroundColor(event.target.value)}
-                disabled={isTransparent}
-                className="h-9 w-full rounded border border-slate-700 bg-slate-950 p-1 disabled:opacity-50"
-              />
-            </label>
-
-            <button
-              onClick={() => resetEditorState(EDITOR_STATE)}
-              className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-slate-100 hover:bg-slate-700"
-            >
-              Reset Editor State
-            </button>
-          </div>
-        </section>
-
-        <div className="w-full overflow-auto">
-          <div className="mx-auto w-fit border border-slate-800 rounded-lg overflow-hidden mt-6">
-            <EditorCanvas className="block w-full h-auto" />
+        <div className="">
+          <div className="mx-auto w-fit overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900">
+            <EditorCanvas
+              activeTool={activeTool}
+              className="block h-auto w-full touch-none select-none"
+            />
           </div>
         </div>
       </div>

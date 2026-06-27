@@ -135,7 +135,7 @@ export type ThreeDLayer = BaseLayer & {
         fov: number
       }
 
-      lighting?: any
+      lighting?: Record<string, unknown>
     }
 
     // snapshot used by canvas

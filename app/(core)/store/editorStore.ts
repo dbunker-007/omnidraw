@@ -23,6 +23,11 @@ type EditorStore = {
   setEditorState: (
     updater: EditorState | ((prev: EditorState) => EditorState)
   ) => void
+  addLayer: (layer: Layer) => void
+  updateLayer: (
+    layerId: string,
+    updater: (layer: Layer) => Layer
+  ) => void
   setCanvasSize: (width: number, height: number) => void
   setBackgroundColor: (color: string | null) => void
   setLayers: (layers: Layer[]) => void
@@ -41,6 +46,24 @@ export const useEditorStore = create<EditorStore>((set) => ({
         typeof updater === 'function'
           ? (updater as (prev: EditorState) => EditorState)(state.editorState)
           : updater,
+    })),
+
+  addLayer: (layer) =>
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        layers: [...state.editorState.layers, layer],
+      },
+    })),
+
+  updateLayer: (layerId, updater) =>
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        layers: state.editorState.layers.map((layer) =>
+          layer.id === layerId ? updater(layer) : layer
+        ),
+      },
     })),
 
   setCanvasSize: (width, height) =>
