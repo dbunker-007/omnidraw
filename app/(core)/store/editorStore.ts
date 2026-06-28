@@ -20,6 +20,7 @@ const EDITOR_STATE: EditorState = {
 
 type EditorStore = {
   editorState: EditorState
+  pencilColor: string
   setEditorState: (
     updater: EditorState | ((prev: EditorState) => EditorState)
   ) => void
@@ -28,6 +29,8 @@ type EditorStore = {
     layerId: string,
     updater: (layer: Layer) => Layer
   ) => void
+  removeLayer: (layerId: string) => void
+  setPencilColor: (color: string) => void
   setCanvasSize: (width: number, height: number) => void
   setBackgroundColor: (color: string | null) => void
   setLayers: (layers: Layer[]) => void
@@ -39,6 +42,7 @@ type EditorStore = {
 
 export const useEditorStore = create<EditorStore>((set) => ({
   editorState: EDITOR_STATE,
+  pencilColor: '#000000',
 
   setEditorState: (updater) =>
     set((state) => ({
@@ -65,6 +69,23 @@ export const useEditorStore = create<EditorStore>((set) => ({
         ),
       },
     })),
+
+  removeLayer: (layerId) =>
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        layers: state.editorState.layers.filter((layer) => layer.id !== layerId),
+        activeLayerId:
+          state.editorState.activeLayerId === layerId
+            ? null
+            : state.editorState.activeLayerId,
+      },
+    })),
+
+  setPencilColor: (color) =>
+    set({
+      pencilColor: color,
+    }),
 
   setCanvasSize: (width, height) =>
     set((state) => ({

@@ -2,7 +2,7 @@ import type { DrawingLayer, Stroke } from '../../engine/layers/types'
 import type { CanvasPoint, ToolDefinition } from './types'
 import { PenLine } from 'lucide-react'
 
-const DEFAULT_PENCIL_COLOR = '#f8fafc'
+const DEFAULT_PENCIL_COLOR = '#000000'
 const DEFAULT_PENCIL_WIDTH = 3
 
 export const pencilTool: ToolDefinition = {
@@ -10,6 +10,16 @@ export const pencilTool: ToolDefinition = {
   label: 'Pencil',
   description: 'Draw a new stroke layer',
   icon: PenLine,
+}
+
+let pencilColor = DEFAULT_PENCIL_COLOR
+
+export function getPencilColor() {
+  return pencilColor
+}
+
+export function setPencilColor(color: string) {
+  pencilColor = color
 }
 
 function createEmptyStroke(): Stroke {
@@ -22,7 +32,8 @@ function createEmptyStroke(): Stroke {
 
 export function createPencilLayer(
   startPoint: CanvasPoint,
-  zIndex: number
+  zIndex: number,
+  color = pencilColor
 ): DrawingLayer {
   return {
     id: crypto.randomUUID(),
@@ -45,7 +56,12 @@ export function createPencilLayer(
       createdAt: Date.now(),
     },
     data: {
-      strokes: [createEmptyStroke()],
+      strokes: [
+        {
+          ...createEmptyStroke(),
+          color,
+        },
+      ],
     },
   }
 }
@@ -116,6 +132,22 @@ export function appendPointToPencilLayer(
   }
 }
 
+export function setDrawingLayerColor(
+  layer: DrawingLayer,
+  color: string
+): DrawingLayer {
+  return {
+    ...layer,
+    data: {
+      ...layer.data,
+      strokes: layer.data.strokes.map((stroke) => ({
+        ...stroke,
+        color,
+      })),
+    },
+  }
+}
+
 export function normalizePencilLayer(layer: DrawingLayer): DrawingLayer {
   const points = layer.data.strokes.flatMap((stroke) => stroke.points)
 
@@ -172,6 +204,10 @@ export function renderPencilLayer(
 
   context.save()
   context.translate(layer.transform.x, layer.transform.y)
+  context.translate(layer.transform.width / 2, layer.transform.height / 2)
+  context.rotate((layer.transform.rotation * Math.PI) / 180)
+  context.scale(layer.transform.scaleX, layer.transform.scaleY)
+  context.translate(-layer.transform.width / 2, -layer.transform.height / 2)
   context.globalAlpha = layer.transform.opacity
   context.lineCap = 'round'
   context.lineJoin = 'round'

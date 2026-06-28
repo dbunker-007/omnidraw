@@ -11,9 +11,13 @@ import {
   renderPencilLayer,
 } from './tools/PencilTool'
 import {
-  getLayerBounds,
+  getHandleAtPoint,
+  getSelectionGeometry,
   hitTestLayer,
   moveLayer,
+  rotateLayer,
+  resizeLayer,
+  type SelectionHandleId,
 } from './tools/SelectTool'
 import type { CanvasPoint, EditorToolId } from './tools/types'
 
@@ -27,17 +31,59 @@ type InteractionState =
       mode: 'idle'
     }
   | {
-      mode: 'dragging'
+      mode: 'drawing'
+      layerId: string
+    }
+  | {
+      mode: 'moving'
       layerId: string
       lastPoint: CanvasPoint
     }
   | {
-      mode: 'drawing'
+      mode: 'resizing'
       layerId: string
+      handleId: Exclude<SelectionHandleId, 'rotate'>
+      startLayer: Layer
+    }
+  | {
+      mode: 'rotating'
+      layerId: string
+      startLayer: Layer
+      startPointer: CanvasPoint
+      startRotation: number
     }
 
 function isDrawingLayer(layer: Layer): layer is DrawingLayer {
   return layer.type === 'drawing'
+}
+
+function getLayerById(layers: Layer[], layerId: string | null) {
+  if (layerId === null) {
+    return null
+  }
+
+  return layers.find((layer) => layer.id === layerId) ?? null
+}
+
+function drawHandle(
+  context: CanvasRenderingContext2D,
+  point: CanvasPoint,
+  isRotationHandle = false
+) {
+  const size = isRotationHandle ? 8 : 7
+  const halfSize = size / 2
+
+  context.beginPath()
+  if (isRotationHandle) {
+    context.arc(point.x, point.y, 4, 0, Math.PI * 2)
+    context.fill()
+    context.stroke()
+    return
+  }
+
+  context.rect(point.x - halfSize, point.y - halfSize, size, size)
+  context.fill()
+  context.stroke()
 }
 
 export default function EditorCanvas({
@@ -51,6 +97,7 @@ export default function EditorCanvas({
   )
   const layers = useEditorStore((state) => state.editorState.layers)
   const activeLayerId = useEditorStore((state) => state.editorState.activeLayerId)
+  const pencilColor = useEditorStore((state) => state.pencilColor)
   const setActiveLayerId = useEditorStore((state) => state.setActiveLayerId)
   const addLayer = useEditorStore((state) => state.addLayer)
   const updateLayer = useEditorStore((state) => state.updateLayer)
@@ -103,19 +150,44 @@ export default function EditorCanvas({
       }
     }
 
-    const selectedLayer = orderedLayers.find((layer) => layer.id === activeLayerId)
+    const selectedLayer = getLayerById(orderedLayers, activeLayerId)
 
-    if (selectedLayer) {
-      const bounds = getLayerBounds(selectedLayer)
+    if (selectedLayer && activeTool === 'select') {
+      const geometry = getSelectionGeometry(selectedLayer)
 
       context.save()
-      context.strokeStyle = '#22d3ee'
-      context.lineWidth = 2
-      context.setLineDash([8, 6])
-      context.strokeRect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4)
+      context.strokeStyle = '#2563eb'
+      context.fillStyle = '#ffffff'
+      context.lineWidth = 1
+
+      const { nw, ne, se, sw } = geometry.corners
+
+      context.beginPath()
+      context.moveTo(nw.x, nw.y)
+      context.lineTo(ne.x, ne.y)
+      context.lineTo(se.x, se.y)
+      context.lineTo(sw.x, sw.y)
+      context.closePath()
+      context.stroke()
+
+      context.beginPath()
+      context.moveTo(geometry.corners.n.x, geometry.corners.n.y)
+      context.lineTo(geometry.rotationHandle.x, geometry.rotationHandle.y)
+      context.stroke()
+
+      drawHandle(context, geometry.corners.nw)
+      drawHandle(context, geometry.corners.n)
+      drawHandle(context, geometry.corners.ne)
+      drawHandle(context, geometry.corners.e)
+      drawHandle(context, geometry.corners.se)
+      drawHandle(context, geometry.corners.s)
+      drawHandle(context, geometry.corners.sw)
+      drawHandle(context, geometry.corners.w)
+      drawHandle(context, geometry.rotationHandle, true)
+
       context.restore()
     }
-  }, [activeLayerId, backgroundColor, layers])
+  }, [activeLayerId, activeTool, backgroundColor, layers])
 
   useEffect(() => {
     renderCanvas()
@@ -141,7 +213,7 @@ export default function EditorCanvas({
         (maxZIndex, layer) => Math.max(maxZIndex, layer.zIndex),
         -1
       ) + 1
-      const layer = createPencilLayer(point, nextZIndex)
+      const layer = createPencilLayer(point, nextZIndex, pencilColor)
       addLayer(layer)
       setActiveLayerId(layer.id)
       interactionRef.current = {
@@ -149,6 +221,42 @@ export default function EditorCanvas({
         layerId: layer.id,
       }
       return
+    }
+
+    const selectedLayer = getLayerById(layers, activeLayerId)
+
+    if (selectedLayer) {
+      const handleId = getHandleAtPoint(point, selectedLayer)
+
+      if (handleId === 'rotate') {
+        interactionRef.current = {
+          mode: 'rotating',
+          layerId: selectedLayer.id,
+          startLayer: selectedLayer,
+          startPointer: point,
+          startRotation: selectedLayer.transform.rotation,
+        }
+        return
+      }
+
+      if (handleId) {
+        interactionRef.current = {
+          mode: 'resizing',
+          layerId: selectedLayer.id,
+          handleId,
+          startLayer: selectedLayer,
+        }
+        return
+      }
+
+      if (hitTestLayer(point, selectedLayer)) {
+        interactionRef.current = {
+          mode: 'moving',
+          layerId: selectedLayer.id,
+          lastPoint: point,
+        }
+        return
+      }
     }
 
     const targetLayer = [...layers]
@@ -163,7 +271,7 @@ export default function EditorCanvas({
 
     setActiveLayerId(targetLayer.id)
     interactionRef.current = {
-      mode: 'dragging',
+      mode: 'moving',
       layerId: targetLayer.id,
       lastPoint: point,
     }
@@ -179,7 +287,7 @@ export default function EditorCanvas({
 
     const point = getCanvasPoint(event)
 
-    if (interaction.mode === 'drawing' && interaction.layerId) {
+    if (interaction.mode === 'drawing') {
       updateLayer(interaction.layerId, (layer) => {
         if (!isDrawingLayer(layer)) {
           return layer
@@ -190,7 +298,7 @@ export default function EditorCanvas({
       return
     }
 
-    if (interaction.mode === 'dragging') {
+    if (interaction.mode === 'moving') {
       const delta = {
         x: point.x - interaction.lastPoint.x,
         y: point.y - interaction.lastPoint.y,
@@ -201,10 +309,41 @@ export default function EditorCanvas({
         ...interaction,
         lastPoint: point,
       }
+      return
+    }
+
+    if (interaction.mode === 'resizing') {
+      updateLayer(interaction.layerId, () =>
+        resizeLayer(interaction.startLayer, interaction.handleId, point)
+      )
+      return
+    }
+
+    if (interaction.mode === 'rotating') {
+      updateLayer(interaction.layerId, () =>
+        rotateLayer(
+          interaction.startLayer,
+          point,
+          interaction.startPointer,
+          interaction.startRotation,
+          {
+            x:
+              interaction.startLayer.transform.x +
+              (interaction.startLayer.transform.width *
+                interaction.startLayer.transform.scaleX) /
+                2,
+            y:
+              interaction.startLayer.transform.y +
+              (interaction.startLayer.transform.height *
+                interaction.startLayer.transform.scaleY) /
+                2,
+          }
+        )
+      )
     }
   }
 
-  const finishInteraction = () => {
+  const finishInteraction = (event: PointerEvent<HTMLCanvasElement>) => {
     const interaction = interactionRef.current
 
     if (interaction.mode === 'drawing') {
@@ -218,6 +357,12 @@ export default function EditorCanvas({
     }
 
     interactionRef.current = { mode: 'idle' }
+
+    const canvas = canvasRef.current
+
+    if (canvas && canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId)
+    }
   }
 
   return (
